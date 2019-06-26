@@ -28,6 +28,7 @@ namespace NeuralNetwork
 		static List<float> speciesFitness;
 		static int[] speciesOffspring;
 		static List<Genome> speciesMarkers;
+		static Dictionary<uint, uint> splitList;
 		
 		static Random rng;
 		
@@ -63,6 +64,7 @@ namespace NeuralNetwork
 			species = new List<List<int>>();
 			speciesFitness = new List<float>();
 			speciesMarkers = new List<Genome>();
+			splitList = new Dictionary<uint, uint>();
 			for(int i = 0; i < popSize; i++)
 			{
 				population[i] = SeedGenome();
@@ -102,7 +104,6 @@ namespace NeuralNetwork
 			Report();
 		}
 		
-		//TODO: Still hilariously broken
 		static void Provision()
 		{
 			speciesOffspring = new int[species.Count];
@@ -126,14 +127,12 @@ namespace NeuralNetwork
 			{
 				sumFitness += speciesFitness[i] * species[i].Count;
 			}
-			float offspringPerFitness = offspringRemaining * sumFitness;
-			float speciesFactor;
+			float totalOverSum = (float)offspringRemaining / sumFitness;
 			for(int i = 0; i < species.Count; i++)
 			{
-				speciesFactor = speciesFitness[i] * species[i].Count;
-				speciesOffspring[i] += (int)(offspringPerFitness / speciesFactor);
+				speciesOffspring[i] += (int)(totalOverSum * speciesFitness[i] * species[i].Count);
 				Console.WriteLine("Allocated {0} offspring to species {1}", speciesOffspring[i], i);
-				offspringRemaining -= (int)(offspringPerFitness / speciesFactor);
+				offspringRemaining -= (int)(totalOverSum * speciesFitness[i] * species[i].Count);
 			}
 			if(offspringRemaining < 0)
 			{
@@ -155,7 +154,6 @@ namespace NeuralNetwork
 			int parent1;
 			int parent2;
 			Genome child;
-			Dictionary<uint, uint> splitList = new Dictionary<uint, uint>();
 			for(int i = 0; i < species.Count; i++)
 			{
 				offspring = speciesOffspring[i];
@@ -289,8 +287,8 @@ namespace NeuralNetwork
 		{
 			Genome result = subject.Copy();
 			Dictionary<uint, Dictionary<uint, float>> adjacence = result.Link(result.Resolve());
-			uint from = (uint)rng.Next(result.contents.Count);
-			uint to = (uint)(rng.Next(Math.Max(result.contents.Count - inputCount, outputCount)) + inputCount);
+			uint from = (uint)rng.Next(adjacence.Count);
+			uint to = (uint)(rng.Next(Math.Max(adjacence.Count - inputCount, outputCount)) + inputCount);
 			uint i = 0;
 			foreach(KeyValuePair<uint, Dictionary<uint, float>> node in adjacence)
 			{
@@ -315,7 +313,7 @@ namespace NeuralNetwork
 			return result;
 		}
 		
-		static Genome AddNode(Genome subject, ref Dictionary<uint, uint> splitList)
+		static Genome AddNode(Genome subject, ref Dictionary<uint, uint> sList)
 		{
 			Genome result = subject.Copy();
 			int target = rng.Next(result.contents.Count);
@@ -325,17 +323,17 @@ namespace NeuralNetwork
 			{
 				if(i == target)
 				{
-					if(!splitList.ContainsKey(gene.Key))
+					if(!sList.ContainsKey(gene.Key))
 					{
-						splitList.Add(gene.Key, nodeCounter);
+						sList.Add(gene.Key, nodeCounter);
 						nodeCounter++;
 					}
-					Console.WriteLine("Adding node {0}", splitList[gene.Key]);
+					Console.WriteLine("Adding node {0}", sList[gene.Key]);
 					oldLink = Genome.PairInverse(gene.Key);
 					//Create new link from selected gene's from, to new node
-					result.contents.Add(Genome.Pair(oldLink[0], splitList[gene.Key]), (float)(rng.NextDouble()*2-1));
+					result.contents[Genome.Pair(oldLink[0], sList[gene.Key])] = (float)(rng.NextDouble()*2-1);
 					//Create new link from new node, to selected gene's to
-					result.contents.Add(Genome.Pair(splitList[gene.Key], oldLink[1]), (float)(rng.NextDouble()*2-1));
+					result.contents[Genome.Pair(sList[gene.Key], oldLink[1])] = (float)(rng.NextDouble()*2-1);
 					//Disable selected gene
 					result.contents.Remove(gene.Key);
 					break;
